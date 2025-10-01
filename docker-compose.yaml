@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # 1. Frontend WebGUI Service
+  frontend:
+    build:
+      context: .                  
+      dockerfile: dockerfiles/Dockerfile.webgui
+
+    container_name: whisper-frontend
+
+    ports:
+      - "9999:80"
+
+    networks:
+      - app-net
+
+  # 2. Backend/API Gateway (Node.js)
+  api-gateway:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.nodejs   
+    
+    container_name: whisper-api-gateway
+    
+    networks:
+      - app-net
+
+  # 3. Message Broker (Pre-built image, no custom build needed)
+  message-queue:
+    image: redis:7.2-alpine # Still use 'image' for external, pre-built images
+    
+    container_name: redis-queue
+    
+    networks:
+      - app-net
+
+  # 4. Worker (container with precompiled whisper. cpp)
+  whisper-worker:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.whisperworker
+    
+    networks:
+      - app-net
+  container_name: whisper-worker
+  
+networks:
+  app-net:
+    driver: bridge

@@ -1,0 +1,59 @@
+# Dockerfile.whisper-server
+
+# ========================
+# Stage 1: Build the C++ executable
+# ========================
+FROM debian:bookworm-slim AS builder
+
+WORKDIR /whisper
+
+# Install necessary build tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    git \
+    cmake \
+    make \
+    gcc \
+    g++ \
+    curl \
+    ca-certificates \
+    ffmpeg
+
+
+# Clone and compile whisper.cpp (including whisper-server)
+RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git
+
+WORKDIR /whisper/whisper.cpp
+RUN cmake -B build
+RUN cmake --build build -j --config Release
+
+# Download the model
+RUN bash ./models/download-ggml-model.sh medium
+
+# ========================
+# Stage 2: Minimal Runtime
+# ========================
+FROM debian:bookworm-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libstdc++6 \
+    libgomp1 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the specific compiled binary and model file
+COPY --from=builder /whisper/whisper.cpp/build/bin/whisper-server /app/
+COPY --from=builder /whisper/whisper.cpp/build/src/libwhisper* /app/libs/
+COPY --from=builder /whisper/whisper.cpp/build/ggml/src/libggml* /app/libs/
+COPY --from=builder /whisper/whisper.cpp/models/ggml*.bin /app/models/
+
+RUN echo '/app/libs' > /etc/ld.so.conf.d/whisper.conf && ldconfig
+
+EXPOSE 8080
+
+# Final command to run the server
+ENTRYPOINT [ "/app/whisper-server" ]
+CMD ["-m" , "/app/models/ggml-medium.bin", "--host", "0.0.0.0"]

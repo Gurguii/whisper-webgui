@@ -12,9 +12,11 @@
   "type": "commonjs",
   "dependencies": {
     "axios": "^1.12.2",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "form-data": "^4.0.4",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "unique-filename": "^4.0.0"
   }
 }

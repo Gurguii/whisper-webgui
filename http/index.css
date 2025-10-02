@@ -27,7 +27,7 @@ body {
 }
 
 .highlight-drop-area{
-    background: #4cae4c;
+    background: #28a745;
     transform: scale(1.15);
 }
 
@@ -98,4 +98,82 @@ button[type="submit"]:hover {
 
 .mandatory_field{
     color: red;
+}
+
+#status {
+    margin-top: 20px;
+    padding: 10px;
+    border-top: 2px solid #ccc;
+}
+
+.statusOfFile {
+    background-color: #f9f9f9; 
+    border: 1px solid #eee;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.3s ease, opacity 0.3s ease;
+}
+
+.statusOfFile.downloaded {
+    opacity: 0.5;
+}
+
+.statusOfFile p {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 500;
+    color: #333;
+    white-space: nowrap; 
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 15px; 
+}
+
+.statusOfFile b {
+    font-weight: 600;
+    color: #007bff; 
+    text-align: right;
+}
+
+.statusOfFile a {
+    color: #28a745; 
+    text-decoration: none; 
+    font-weight: 700;
+}
+
+.statusOfFile a:hover {
+    text-decoration: underline; 
+    color: #1e7e34;
+}
+
+
+.advanced-options summary {
+    display: inline-block;
+    padding: 5px 10px;
+    background-color: #007bff;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    user-select: none; 
+    margin-bottom: 10px;
+}
+
+.advanced-options summary:hover {
+    background-color: #0056b3;
+}
+
+.advanced-options .advanced-content {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+}
+
+.advanced-options:not([open]) .advanced-content {
+    border-top: 1px solid #ccc;
 }

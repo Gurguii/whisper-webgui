@@ -36,10 +36,10 @@ function handleDrop(e) {
     fileInput.files = files; // Assign the dropped files to the file input
     // You can optionally display the names of the dropped files
     if (files.length > 0) {
-        console.log('Archivos arrastrados:', files);
+        console.log('Selected files:', files);
         // Optionally update the label or display file names
         const fileNames = Array.from(files).map(file => file.name).join(', ');
-        dropArea.querySelector('p').innerHTML = `<b>Archivos seleccionados: ${fileNames}</b>`;
+        dropArea.querySelector('p').innerHTML = `<b>Selected files: ${fileNames}</b>`;
     }
 }
 
@@ -52,9 +52,9 @@ dropArea.addEventListener('click', () => {
 fileInput.addEventListener('change', () => {
     if (fileInput.files.length > 0) {
         const fileNames = Array.from(fileInput.files).map(file => file.name).join(', ');
-        dropArea.querySelector('p').innerHTML = `<b>Archivos seleccionados: ${fileNames}</b>`;
+        dropArea.querySelector('p').innerHTML = `<b>Selected files: ${fileNames}</b>`;
     } else {
-        dropArea.querySelector('p').innerHTML = '<b>Arrastra y suelta tus archivos aquí o haz clic para seleccionar</b>';
+        dropArea.querySelector('p').innerHTML = '<b>Drag and drop or click to select</b>';
     }
 });
 /* END - Drag and drop */
@@ -68,49 +68,78 @@ function changeExt(filePath, newext){
 document.getElementById('transcribeForm').addEventListener('submit', async (event) => {
     event.preventDefault();
 
+    // Empty the status elements, removing previous download buttons
+    document.getElementById('status').innerHTML = "";
+
     const formData = new FormData(event.target);
-    const filename = formData.getAll('audioVideoFile');
+    const files = formData.getAll('audioVideoFile');
 
-    console.log(`Filenames for polling -> ${filename}`);
+    // Create a paragraph with a download href for each file
+    document.getElementById('status').innerHTML = "";
+    
+    files.forEach(file => {
+        document.getElementById('status').innerHTML += `<div class='statusOfFile' id='${file.name}_div'><p id='${file.name}_p'>${file.name} <b id='${file.name}_status'></b></p></div>`;      
+    })
 
-    document.getElementById('status').innerHTML = 'Transcription in progress...';
+    /* BEG - request to backend to start transcribing */ 
+    await fetch('http://localhost:3000/whizard', {
+        method: 'POST',
+        body: formData,
+    }).then(async response => {
+        if(response.status === 202)
+        {
+            const data = await response.json();
+            
+            const status = data.status;
+            let receivedRequests = data.filesToProcess;
 
-    /* BEG - Async request to backend to start transcribing */ 
-    try {
-        console.log("hehehe");
+            const statusCheck = data.statusCheckUrl;
 
-        const response = await fetch('http://localhost:3000/whizard', {
-            method: 'POST',
-            body: formData,
-        });
+            var completedFiles = {};
 
-        console.log("hahaha");
-        if (response.status === 202) {
-            // Start polling
             const intervalId = setInterval(async () => {
                 try {
                     console.log("Polling");
-                    //console.log("interval");
-                    const statusResponse = await fetch(`/api/transcription-status/${filename}`);
+
+                    const statusResponse = await fetch(statusCheck);
                     const statusData = await statusResponse.json();
 
-                    if (statusData.status === 'completed') {
-                        clearInterval(intervalId);
-                        document.getElementById('status').innerHTML = `<a href="/api/download/${filename}.gz">Download Transcription</a>`;
-                    } else if (statusData.status === 'failed') {
-                        clearInterval(intervalId);
-                        document.getElementById('status').innerHTML = `Transcription failed: ${statusData.error}`;
+                    console.log(statusData);
+
+                    for(const [file,props] of Object.entries(statusData)){
+                        const statusElement = document.getElementById(`${props.originalFileName}_status`);
+                        const divElement = document.getElementById(`${props.originalFileName}_div`);
+
+                        if(props.status === "done" && ! (file in completedFiles)){
+                            statusElement.innerHTML = `<a class='download-link' href=${props.downloadUrl}>completed<br>`;
+                            statusElement.querySelector('.download-link').addEventListener('click', function(e){
+                                divElement.style.display = 'none';
+                            })
+
+                            completedFiles[file] = "";
+                            --receivedRequests;
+                        }else if(props.status === "pending"){
+                            statusElement.innerHTML = `<b>pending</b>`;
+                        }else if(props.status === "failed"){
+                            statusElement.innerHTML += `Transcription failed for ${props.originalFileName} ${statusData.error}`;
+                            --receivedRequests;
+                        }
                     }
+
+                    console.log(`Received requests: ${receivedRequests}`);
+
+                    if(receivedRequests === 0){
+                        // All requests have been processed, stop the polling
+                        clearInterval(intervalId);
+                    };
+
                 } catch (error) {
-                    console.error('Error polling status:', error);
-                }
+                console.error('Error polling status:', error);
+            }
             }, 3000); // Poll every 3 seconds
-        } else {
-            document.getElementById('status').innerHTML = 'Error starting transcription.';
         }
-    } catch (error) {
-        console.error('Error submitting form:', error);
-        document.getElementById('status').innerHTML = 'Error submitting form.';
-    }
-    /* END - Async request to backend to start transcribing */
+    }).catch(err => {
+        console.log("Got an error", err);
+    });
+    /* END - request to backend to start transcribing */
 });

@@ -26,16 +26,7 @@ services:
     networks:
       - app-net
 
-  # 3. Message Broker (Pre-built image, no custom build needed)
-  message-queue:
-    image: redis:7.2-alpine # Still use 'image' for external, pre-built images
-    
-    container_name: redis-queue
-    
-    networks:
-      - app-net
-
-  # 4. Worker (container with precompiled whisper. cpp)
+  # 3. Worker (container with precompiled whisper.cpp)
   whisper-worker:
     build:
       context: .

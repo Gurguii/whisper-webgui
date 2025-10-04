@@ -23,7 +23,7 @@ if(await initialChecks() == true){
         if(error){
             throw `Error: ${error}`;
         }
-        console.log(`Server listening on port ${process.env.NODE_LISTEN_PORT}\nWhisper binary: ${process.env.WHISPER_BINARY}\nWhisper Upload Dir: ${process.env.WHISPER_UPLOAD_DIR}\nTranscriptions output dir: ${process.env.TRANSCRIPTION_OUTPUT_DIR}`);
+        console.log(`Server listening on port ${process.env.NODE_LISTEN_PORT}`);
     });
 }else{
     console.log("Inital checks failed, not starting the app");

@@ -1,0 +1,11 @@
+FROM nginx:latest
+
+RUN apt update -y && apt upgrade -y
+
+COPY ./config/gwhisp_nginx_loadbalancing.conf /etc/nginx/conf.d/gwhisp.conf
+
+ENTRYPOINT ["nginx"]
+
+EXPOSE 80
+
+CMD ["-g", "daemon off;"]

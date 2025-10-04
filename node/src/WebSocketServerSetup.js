@@ -15,7 +15,7 @@ const wss = new WebSocketServer(
 wss.on('connection', (ws, req) => {
     console.log(`Received a new socket connection with url ${req.url}`);
     const urlPaths = req.url.split('/');
-    const job = urlPaths[1];
+    const job = urlPaths[urlPaths.length - 1];
     
     if(job in fileStatus){
         console.log(`Job ${job} is in the list, registering it`);

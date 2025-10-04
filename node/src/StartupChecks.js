@@ -2,9 +2,9 @@ async function checkWhisperService()
 {
     // 1. Check that whisper service is accesible.
     try{
-        const response = await fetch("http://localhost:8080");
+        const response = await fetch("http://gwhisp-worker:8080");
         console.log(response);
-
+        
         if(response.ok && response.status === 200){
             return true;
         }

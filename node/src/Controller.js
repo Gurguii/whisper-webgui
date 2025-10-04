@@ -55,7 +55,7 @@ export async function transcribeAndtranslate(req, res)
         form.append("language", req.body.language);
 
         // 3. Send the request asynchronously to whisper-server using axios
-        axios.post("http://localhost:8080/inference", form, {
+        axios.post("http://gwhisp-worker:8080/inference", form, {
                 headers: form.getHeaders(),
                 responseType: 'arraybuffer'
             }
@@ -81,7 +81,7 @@ export async function transcribeAndtranslate(req, res)
                     {
                         status: "done",
                         originalFileName: file.originalname,
-                        downloadUrl: `http://localhost:3000/download/${randomTmpFileBasenameExt}`,
+                        downloadUrl: `http://mydomain.com:3000/api/download/${randomTmpFileBasenameExt}`,
                         jobStatus: `${filesToProcess === 0 ? "done" : "ongoing"}`
                     }
                 ));
@@ -89,7 +89,7 @@ export async function transcribeAndtranslate(req, res)
                 fileStatus[jobId][randomTmpFileBasenameExt] = {
                     status: "done",
                     originalFileName: file.originalname,
-                    downloadUrl: `http://localhost:3000/download/${randomTmpFileBasenameExt}`
+                    downloadUrl: `http://mydomain.com:3000/api/download/${randomTmpFileBasenameExt}`
                 }
 
                 if(filesToProcess === 0){

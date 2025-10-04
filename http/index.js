@@ -82,7 +82,7 @@ document.getElementById('transcribeForm').addEventListener('submit', async (even
     })
 
     /* BEG - request to backend to start transcribing */ 
-await fetch('http://localhost:3000/whizard', {
+await fetch('http://mydomain.com/api', {
         method: 'POST',
         body: formData,
     }).then(async response => {
@@ -94,7 +94,7 @@ await fetch('http://localhost:3000/whizard', {
             const jobId = data.jobId; 
 
             // --- REPLACED POLLING LOGIC WITH WEBSOCKET ---
-            const websocketUrl = `ws://localhost:3333/${jobId}`; 
+            const websocketUrl = `ws://mydomain.com/api/ws/${jobId}`; 
             
             const ws = new WebSocket(websocketUrl);
             

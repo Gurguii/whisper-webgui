@@ -4,3 +4,4 @@ translations/
 uploads/
 whisper.cpp/
 node/node_modules/
+*log

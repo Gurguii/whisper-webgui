@@ -78,11 +78,11 @@ document.getElementById('transcribeForm').addEventListener('submit', async (even
     document.getElementById('status').innerHTML = "";
     
     files.forEach(file => {
-        document.getElementById('status').innerHTML += `<div class='statusOfFile' id='${file.name}_div'><p id='${file.name}_p'>${file.name} <b id='${file.name}_status'></b></p></div>`;      
+        document.getElementById('status').innerHTML += `<div class='statusOfFile' id='${file.name}_div'><p id='${file.name}_p'>${file.name} <b id='${file.name}_status'>processing</b></p></div>`;      
     })
 
     /* BEG - request to backend to start transcribing */ 
-    await fetch('http://localhost:3000/whizard', {
+await fetch('http://localhost:3000/whizard', {
         method: 'POST',
         body: formData,
     }).then(async response => {
@@ -90,53 +90,63 @@ document.getElementById('transcribeForm').addEventListener('submit', async (even
         {
             const data = await response.json();
             
-            const status = data.status;
-            let receivedRequests = data.filesToProcess;
+            // Assuming the 202 response includes a jobId:
+            const jobId = data.jobId; 
 
-            const statusCheck = data.statusCheckUrl;
-
-            var completedFiles = {};
-
-            const intervalId = setInterval(async () => {
-                try {
-                    console.log("Polling");
-
-                    const statusResponse = await fetch(statusCheck);
-                    const statusData = await statusResponse.json();
-
-                    console.log(statusData);
-
-                    for(const [file,props] of Object.entries(statusData)){
-                        const statusElement = document.getElementById(`${props.originalFileName}_status`);
-                        const divElement = document.getElementById(`${props.originalFileName}_div`);
-
-                        if(props.status === "done" && ! (file in completedFiles)){
-                            statusElement.innerHTML = `<a class='download-link' href=${props.downloadUrl}>completed<br>`;
-                            statusElement.querySelector('.download-link').addEventListener('click', function(e){
-                                divElement.style.display = 'none';
-                            })
-
-                            completedFiles[file] = "";
-                            --receivedRequests;
-                        }else if(props.status === "pending"){
-                            statusElement.innerHTML = `<b>pending</b>`;
-                        }else if(props.status === "failed"){
-                            statusElement.innerHTML += `Transcription failed for ${props.originalFileName} ${statusData.error}`;
-                            --receivedRequests;
-                        }
-                    }
-
-                    console.log(`Received requests: ${receivedRequests}`);
-
-                    if(receivedRequests === 0){
-                        // All requests have been processed, stop the polling
-                        clearInterval(intervalId);
-                    };
-
-                } catch (error) {
-                console.error('Error polling status:', error);
+            // --- REPLACED POLLING LOGIC WITH WEBSOCKET ---
+            const websocketUrl = `ws://localhost:3333/${jobId}`; 
+            
+            const ws = new WebSocket(websocketUrl);
+            
+            ws.onopen = () => {
+                ws.send(JSON.stringify({job: jobId, hola: "asdas"}));
             }
-            }, 3000); // Poll every 3 seconds
+            
+            // Handler for receiving status updates from the server
+            ws.onmessage = (event) => {
+                try {
+                    // The server pushes a JSON object (statusData) when a file status changes
+                    const statusData = JSON.parse(event.data); 
+                    
+                    console.log('Received WebSocket update:', statusData);
+                    
+                    const { status, originalFileName, downloadUrl, jobStatus} = statusData;
+                    const statusElement = document.getElementById(`${originalFileName}_status`);
+                    const divElement = document.getElementById(`${originalFileName}_div`);
+
+                    if(status === "done"){
+                        statusElement.innerHTML = `<a class='download-link' href=${downloadUrl}>completed<br>`;
+                        statusElement.querySelector('.download-link').addEventListener('click', function(e){
+                            divElement.style.display = 'none';
+                        })
+                    }else if(status === "failed"){
+                        statusElement.innerHTML += `Transcription failed for ${originalFileName} ${error || 'unknown error'}`;
+                    }
+                    
+                    // If the server indicates the entire job is finished, close the connection
+                    // (Requires the server to send a final 'jobComplete' flag)
+                    if (jobStatus === "done") {
+                        ws.close();
+                        console.log('Job completed. WebSocket connection closed.');
+                    }
+                    
+                } catch (e) {
+                    console.error('Error processing WebSocket message:', e);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket Error:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket connection closed.');
+            };
+
+            // --- END WEBSOCKET LOGIC ---
+
+        } else {
+            // Handle non-202 responses
         }
     }).catch(err => {
         console.log("Got an error", err);

@@ -1,24 +1,23 @@
-const os = require('node:os');
-const fs = require('node:fs');
-const FormData = require('form-data');
+import os from 'os';
+import fs from 'fs';
+import FormData from 'form-data';
+import { randomUUID } from 'crypto'
+import axios from 'axios';
+import path from 'path';
+import uniqueFilename from 'unique-filename';
+import * as wsmanager from './WebSocketManager.js';
 
-const { randomUUID } = require('node:crypto');
-const axios = require('axios');
-const path = require('node:path');
-const uniqueFilename = require('unique-filename')
-
-
-let fileStatus = {
-
-};
+export let fileStatus = new Map();
 
 const tmpDir = os.tmpdir();
 
-async function transcribeAndtranslate(req, res)
+export async function transcribeAndtranslate(req, res)
 {
     const jobId = randomUUID();
 
     let statusList = {};
+
+    let filesToProcess = req.files.length;
 
     req.files.forEach(async file => {
         const randomTmpFile = uniqueFilename(tmpDir);
@@ -75,43 +74,51 @@ async function transcribeAndtranslate(req, res)
                         console.log(`File ${randomTmpFile} succesfully written to disk, updating status...`)
                     }
                 });
+                
+                --filesToProcess;
 
-                fileStatus[jobId][randomTmpFileBasenameExt] = {status: "done", originalFileName: file.originalname, downloadUrl: `http://localhost:3000/download/${randomTmpFileBasenameExt}`}
+                wsmanager.activeConnections[jobId].send(JSON.stringify(
+                    {
+                        status: "done",
+                        originalFileName: file.originalname,
+                        downloadUrl: `http://localhost:3000/download/${randomTmpFileBasenameExt}`,
+                        jobStatus: `${filesToProcess === 0 ? "done" : "ongoing"}`
+                    }
+                ));
+
+                fileStatus[jobId][randomTmpFileBasenameExt] = {
+                    status: "done",
+                    originalFileName: file.originalname,
+                    downloadUrl: `http://localhost:3000/download/${randomTmpFileBasenameExt}`
+                }
+
+                if(filesToProcess === 0){
+                    wsmanager.unregisterConnection(jobId);
+                }
             }        
         }).catch(function (error) {
+            console.log("Caught error");
+
             if (error.response) {
                // The request was made and the server responded with a status code 
                // that falls out of the range of 2xx
                console.error(`Axios Error: ${error.response.status} - ${error.response.statusText}`);
-               console.error("Server Response Data:", error.response.data);
+               console.error("Server Response Data:",
+                 error.response.data);
             } else {
-                console.error("Network or other error:", error.message);
+                console.error("Network or other error:",
+                     error.message);
             }               
         });
     });
 
     fileStatus[jobId] = statusList;
 
-    console.log(statusList);
-    console.log(fileStatus);
-
     // Advice the client we are processing the files and where to check the status.
-    res.status(202).json({statusCheckUrl: `http://localhost:3000/status/${jobId}`, filesToProcess: Object.keys(statusList).length});
+    res.status(202).json({jobId: jobId, filesToProcess: Object.keys(statusList).length});
 };
 
-function getJobStatus(req, res)
-{
-    console.log(`[${req.method}] from ${req.ip} ${req.get('host')}/${req.originalUrl} ${req.params.jobid}`);
-
-    if(fileStatus[req.params.jobid]){
-        res.status(200).json(fileStatus[req.params.jobid]);
-        return;
-    }
-
-    res.status(404).json({status: "error", message: "Job not found or has expired"});
-}
-
-async function downloadFile(req, res) {
+export async function downloadFile(req, res) {
     const filePath = path.join(tmpDir, req.params.file); 
     
     console.log("Preparing to download and remove:", filePath);
@@ -160,11 +167,4 @@ async function downloadFile(req, res) {
             }
         }
     });
-}
-
-module.exports =
-{
-    transcribeAndtranslate,
-    getJobStatus,
-    downloadFile
 }

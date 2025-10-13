@@ -1,0 +1,209 @@
+services:
+  # 0. Load balancer (Nginx)
+  gwhisp-balancer:
+    image: gwhisp-balancer
+    
+    expose:
+      - "80"
+
+    ports:
+      - "80:80"
+
+    depends_on:
+      gwhisp-backend:
+        condition: service_healthy
+        restart: true
+
+      gwhisp-frontend:
+        condition: service_started
+
+    environment:
+      - SERVER_NAME=gwhisp.com
+
+    networks:
+      - app-net
+  # 1. Frontend WebGUI Service
+  gwhisp-frontend:
+    image: gwhisp-frontend
+    
+    expose:
+      - "80" # make it available for other containers to allow front-back communication
+
+    networks:
+      - app-net
+
+    volumes:
+      - ${PWD}/http/:/usr/local/apache2/htdocs/:ro
+  gwhisp-backend:
+    image: gwhisp-backend
+    
+    expose: 
+      - "3000" # api
+      - "3333" # websocket
+
+    depends_on:
+      gwhisp-worker-tiny:
+        condition: service_healthy
+        restart: true
+      gwhisp-worker-small:
+        condition: service_healthy
+        restart: true
+      gwhisp-worker-medium:
+        condition: service_healthy
+        restart: true
+      gwhisp-worker-large:
+        condition: service_healthy
+        restart: true
+      gwhisp-worker-turbo:
+        condition: service_healthy
+        restart: true
+
+    restart: always
+    
+    networks:
+      - app-net
+
+    healthcheck:
+      test: ["CMD-SHELL", "netstat -ltnp | grep 3000"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
+      start_period: 30s
+
+    volumes:
+      - ${PWD}/node/src/:/app/
+      - ${PWD}/node/node_modules/:/app/node_modules/
+
+  gwhisp-worker-tiny:
+    image: gwhisp-worker
+
+    expose:
+      - "8080"
+
+    networks:
+      - app-net
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl localhost:8080"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+    volumes:
+      - whisper_worker_models:/app/models:rw
+
+    command: ["-m", "/app/models/ggml-tiny-q8_0.bin", "--host", "0.0.0.0", "--convert"]
+
+  gwhisp-worker-base:
+    image: gwhisp-worker
+
+    expose:
+      - "8080"
+
+    networks:
+      - app-net
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl localhost:8080"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+    volumes:
+      - whisper_worker_models:/app/models:rw
+
+    command: ["-m", "/app/models/ggml-base-q8_0.bin", "--host", "0.0.0.0", "--convert"]
+
+  gwhisp-worker-small:
+    image: gwhisp-worker
+
+    expose:
+      - "8080"
+
+    networks:
+      - app-net
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl localhost:8080"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+    volumes:
+      - whisper_worker_models:/app/models:rw
+
+    command: ["-m", "/app/models/ggml-small-q8_0.bin", "--host", "0.0.0.0", "--convert"]
+
+  gwhisp-worker-medium:
+    image: gwhisp-worker
+
+    expose:
+      - "8080"
+
+    networks:
+      - app-net
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl localhost:8080"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+    volumes:
+      - whisper_worker_models:/app/models:rw
+
+    command: ["-m", "/app/models/ggml-medium-q8_0.bin", "--host", "0.0.0.0", "--convert"]
+
+  gwhisp-worker-large:
+    image: gwhisp-worker
+
+    expose:
+      - "8080"
+
+    networks:
+      - app-net
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl localhost:8080"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+    volumes:
+      - whisper_worker_models:/app/models:rw
+
+    command: ["-m", "/app/models/ggml-large-v3.bin", "--host", "0.0.0.0", "--convert"]
+
+  gwhisp-worker-turbo:
+    image: gwhisp-worker
+
+    expose:
+      - "8080"
+
+    networks:
+      - app-net
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl localhost:8080"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+    volumes:
+      - whisper_worker_models:/app/models:rw
+
+    command: ["-m", "/app/models/ggml-large-v3-turbo-q8_0.bin", "--host", "0.0.0.0", "--convert"]
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  whisper_worker_models:
+    driver: local

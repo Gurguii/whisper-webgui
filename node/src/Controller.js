@@ -18,12 +18,22 @@ export async function transcribeAndtranslate(req, res)
     let statusList = {};
 
     let filesToProcess = req.files.length;
+    var uniqueNames = new Map();
 
     req.files.forEach(async file => {
         const randomTmpFile = uniqueFilename(tmpDir);
-            
-        var fileExtension = "";
+        const uniqueFileName = path.basename(randomTmpFile);
+        uniqueNames[uniqueFileName] = file.originalname;
 
+        uniqueNames.forEach((key,val) => {
+            console.log(`Key: ${key} Val: ${val}`)
+        })
+
+        var fileExtension = "";
+        
+
+        const model = req.body.model;
+        
         if(req.body.outputType === "txt"){
             fileExtension = ".txt";
         }else if(req.body.outputType === "vtt"){
@@ -34,7 +44,7 @@ export async function transcribeAndtranslate(req, res)
             fileExtension = ".json";
         }
 
-        const randomTmpFileBasenameExt = path.basename(randomTmpFile) + fileExtension;
+        const randomTmpFileBasenameExt = uniqueFileName + fileExtension;
 
         statusList[randomTmpFileBasenameExt] = {status: "pending", originalFileName: file.originalname};
 
@@ -49,13 +59,16 @@ export async function transcribeAndtranslate(req, res)
         })
 
         // 2. Append the other fields
+        // This is basicly sending the options to the server
         form.append("response_format", req.body.outputType);
         form.append("no_context", "true");
         form.append("translate", req.body.actionType === "translate" ? "true" : "false");
         form.append("language", req.body.language);
-
+        form.append("prompt", req.body.initial_prompt)
+        form.append("split_on_word", req.body.split_on_word)
+        
         // 3. Send the request asynchronously to whisper-server using axios
-        axios.post("http://gwhisp-worker:8080/inference", form, {
+        axios.post(`http://gwhisp-worker-${model}:8080/inference`, form, {
                 headers: form.getHeaders(),
                 responseType: 'arraybuffer'
             }
@@ -80,8 +93,9 @@ export async function transcribeAndtranslate(req, res)
                 wsmanager.activeConnections[jobId].send(JSON.stringify(
                     {
                         status: "done",
+                        uniqueFileName: uniqueFileName,
                         originalFileName: file.originalname,
-                        downloadUrl: `http://mydomain.com:3000/api/download/${randomTmpFileBasenameExt}`,
+                        downloadUrl: `/api/download/${randomTmpFileBasenameExt}`,
                         jobStatus: `${filesToProcess === 0 ? "done" : "ongoing"}`
                     }
                 ));
@@ -89,7 +103,7 @@ export async function transcribeAndtranslate(req, res)
                 fileStatus[jobId][randomTmpFileBasenameExt] = {
                     status: "done",
                     originalFileName: file.originalname,
-                    downloadUrl: `http://mydomain.com:3000/api/download/${randomTmpFileBasenameExt}`
+                    downloadUrl: `/api/download/${randomTmpFileBasenameExt}`
                 }
 
                 if(filesToProcess === 0){
@@ -115,7 +129,7 @@ export async function transcribeAndtranslate(req, res)
     fileStatus[jobId] = statusList;
 
     // Advice the client we are processing the files and where to check the status.
-    res.status(202).json({jobId: jobId, filesToProcess: Object.keys(statusList).length});
+    res.status(202).json({jobId: jobId, filesToProcess: Object.keys(statusList).length, uniqueNames: uniqueNames});
 };
 
 export async function downloadFile(req, res) {
@@ -150,8 +164,6 @@ export async function downloadFile(req, res) {
             console.log("Client successfully downloaded the file:", filePath);
             
             // 3. Delete the file after a successful download.
-            // Using the synchronous fs.unlinkSync is acceptable here 
-            // since this logic runs AFTER the download is complete.
             try {
                 fs.unlinkSync(filePath);
                 

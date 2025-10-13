@@ -1,11 +1,7 @@
-// Import standard Node modules using default imports
 import express from 'express';
 
-// Import local controller (assuming Controller.js uses 'export default controller')
 import * as controller from './Controller.js'
 
-// Import named exports from config/multerConfig.js
-// Note: The import path needs to include the file extension (.js or .mjs)
 import * as multer from './config/multerConfig.js'
 
 /* Routing */

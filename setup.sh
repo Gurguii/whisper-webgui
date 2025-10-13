@@ -6,22 +6,21 @@
 function help()
 {
     cat << EOF
-Setup script for Whisper Web GUI
+Setup script for gWhisp
 Author: Airán 'Gurguii' Gómez
 
 --- General Options ---
 -h | --help : show this message
 
 --- Node Options ---
--nlp | --node-listen-port <port> : set the whisper listen port, default 3000
+-nlp | --node-listen-port <port> : set the nodejs (app) listen port, default 3000
+-wslp | --websocket-listen-port <port> : set the nodejs (ws server) port, default 3333
 
 --- WebServer Options ---
 -wlp | --web-listen.port <port> : set the webserver listen port, default 9001
 
-
 --- Docker Options ---
---build-all-images      : builds all images inside dockerfiles/ (nginx,nodejs,webgui,whisperworker)
--b   | --build <image|all>  : build desired image (frontend|backend|balancer|worker) or all
+-b   | --build <image|all>  : build desired image (frontend|backend|balancer|worker|all)
 EOF
 
 }
@@ -31,49 +30,57 @@ function buildAllImages()
     # Log variables
     local webguiStdout=".webgui_out.log"
     local webguiStderr=".webgui_err.log"
+    local webguiTag="gwhisp-frontend"
 
     local backendStdout=".backend_out.log"
     local backendStderr=".backend_err.log"
+    local backendTag="gwhisp-backend"
     
     local lbStdout=".lb_out.log"          
     local lbStderr=".lb_err.log"          
-    
+    local lbTag="gwhisp-balancer"
+
     local workerStdout=".worker_out.log"  
     local workerStderr=".worker_err.log"  
+    local workerTag="gwhisp-worker"
 
-    echo ": Building frontend image gwhisp/frontend"
+    echo ": Building $webguiTag"
     # 0. build frontend
-    if ! docker build -t gwhisp/frontend -f dockerfiles/Dockerfile.webgui . 1> "$webguiStdout" 2> "$webguiStderr"; then
+    if ! docker build -t "$webguiTag" -f dockerfiles/Dockerfile.webgui . 1> "$webguiStdout" 2> "$webguiStderr"; then
         # Handle failure here if needed
         echo "Error building frontend image. Check $webguiStderr"
         return 1
     fi
 
-    echo ": Building backend image gwhisp/backend"
+    echo ": Building $backendTag"
     # 1. build backend
-    if ! docker build -t gwhisp/backend -f dockerfiles/Dockerfile.nodejs . 1> "$backendStdout" 2> "$backendStderr"; then
+    if ! docker build -t "$backendTag" -f dockerfiles/Dockerfile.nodejs . 1> "$backendStdout" 2> "$backendStderr"; then
         # Handle failure here if needed
         echo "Error building backend image. Check $backendStderr"
         return 1
     fi
 
-    echo ": Building load balancer image gwhisp/lb"
+    echo ": Building $lbTag"
     # 2. build load balancer
-    if ! docker build -t gwhisp/lb -f dockerfiles/Dockerfile.nginx . 1> "$lbStdout" 2> "$lbStderr"; then
+    if ! docker build -t "$lbTag" -f dockerfiles/Dockerfile.nginx . 1> "$lbStdout" 2> "$lbStderr"; then
         # Handle failure here if needed
         echo "Error building load balancer image. Check $lbStderr"
         return 1
     fi
 
-    echo ": Building whisper worker image gwhisp/worker"
+    echo ": Building $workerTag"
     # 3. build whisper worker
-    if ! docker build -t gwhisp/worker -f dockerfiles/Dockerfile.whisperworker . 1> "$workerStdout" 2> "$workerStderr"; then
+    if ! docker build -t "$workerTag" -f dockerfiles/Dockerfile.whisperworker . 1> "$workerStdout" 2> "$workerStderr"; then
         # Handle failure here if needed
         echo "Error building worker image. Check $workerStderr"
         return 1
     fi
 
     echo "All images built successfully."
+
+    # Remove dangling images
+    printf "y\n" | docker image prune &>/dev/null
+
     return 0
 }
 
@@ -83,16 +90,16 @@ function buildImage()
 
     case "$target" in
         frontend)
-        docker build -t gwhisp/frontend -f dockerfiles/Dockerfile.webgui .
+        docker build -t gwhisp-frontend -f dockerfiles/Dockerfile.webgui .
         ;;
         backend)
-        docker build -t gwhisp/backend -f dockerfiles/Dockerfile.nodejs .
+        docker build -t gwhisp-backend -f dockerfiles/Dockerfile.nodejs .
         ;;
         worker)
-        docker build -t gwhisp/worker -f dockerfiles/Dockerfile.whisperworker .
+        docker build -t gwhisp-worker -f dockerfiles/Dockerfile.whisperworker .
         ;;
         balancer)
-        docker build -t gwhisp/balancer -f dockerfiles/Dockerfile.nginx .
+        docker build -t gwhisp-balancer -f dockerfiles/Dockerfile.nginx .
         ;;
         all)
         buildAllImages
@@ -103,8 +110,6 @@ function buildImage()
     esac
 
 }
-
-
 
 function dependencyCheck()
 {

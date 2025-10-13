@@ -11,7 +11,7 @@ const app = express();
 
 // --- Express Middleware ---
 app.use(cors());
-app.use(express.json());
+
 app.use(express.urlencoded({extended: true}));
 
 // --- Express Routing ---

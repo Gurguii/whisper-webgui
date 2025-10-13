@@ -23,12 +23,13 @@
             <input type="radio" name="outputType" value="json">Json</input>
             <input type="radio" name="outputType" value="srt">Srt</input>
             <input type="radio" name="outputType" value="txt" checked>Txt</input>
-            <input type="radio" name="outputType" value="vtt">Vtt</input>
+            <input type="radio" name="outputType" value="vtt">Vtt</input><br><br>
 
             <label for="model">Model:</label>
             <input type="radio" name="model" value="tiny">Tiny</input>
             <input type="radio" name="model" value="base">Base</input>
             <input type="radio" name="model" value="small">Small</input>
+            <br>
             <input type="radio" name="model" value="medium">Medium</input>
             <input type="radio" name="model" value="large">Large</input>
             <input type="radio" name="model" value="turbo" checked>Turbo</input><br><br>
@@ -36,23 +37,19 @@
             <label for="language">Language:</label>
             <select id="language" name="language">
                 <option value="">-- Please Select --</option>
+                <option value="auto" selected>Auto</option>
                 <option value="aa">Afar</option>
                 <option value="en">English</option>
-                <option value="es" selected>Spanish</option>
+                <option value="es">Spanish</option>
+
                 </select><br><br>
 
             <details class="advanced-options">
                 <summary>Advanced options</summary>
                 <div class="advanced-content">
-                    <label for="word_timestamps" value="False">Word timestamps</label>
-                    <input type="radio" name="word_timestamps" value="True">Sí</input>
-                    <input type="radio" name="word_timestamps" value="False" checked>No</input><br><br>
-                
-                    <label for="max_line_width">Line width:</label>
-                    <input name="max_line_width" type="number" value=20></input><br>
-                
-                    <label for="max_words_per_line">Words per line:</label>
-                    <input name="max_words_per_line" type="number" value=20></input><br>
+                    <label for="split_on_word" value="False">Word timestamps</label>
+                    <input type="radio" name="split_on_word" value="True">Sí</input>
+                    <input type="radio" name="split_on_word" value="False" checked>No</input><br><br>
                 
                     <label for="initial_prompt">Initial prompt:</label>
                     <input name="initial_prompt" type="text" value=""></input>

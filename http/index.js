@@ -2,6 +2,8 @@ const dropArea = document.getElementById('drop-area');
 const fileInput = document.getElementById('audioVideoFile');
 const form = document.getElementById('transcribeForm');
 
+let ongoingJobs = new Array();
+
 /* BEG - Drag and drop */
 ['dragenter', 'dragover', 'dragleave', 'drop', 'mouseover', 'mouseleave'].forEach(eventName => {
     dropArea.addEventListener(eventName, preventDefaults, false)
@@ -34,10 +36,8 @@ function handleDrop(e) {
     const dt = e.dataTransfer
     const files = dt.files
     fileInput.files = files; // Assign the dropped files to the file input
-    // You can optionally display the names of the dropped files
+
     if (files.length > 0) {
-        console.log('Selected files:', files);
-        // Optionally update the label or display file names
         const fileNames = Array.from(files).map(file => file.name).join(', ');
         dropArea.querySelector('p').innerHTML = `<b>Selected files: ${fileNames}</b>`;
     }
@@ -68,38 +68,30 @@ function changeExt(filePath, newext){
 document.getElementById('transcribeForm').addEventListener('submit', async (event) => {
     event.preventDefault();
 
-    // Empty the status elements, removing previous download buttons
-    document.getElementById('status').innerHTML = "";
-
     const formData = new FormData(event.target);
-    const files = formData.getAll('audioVideoFile');
-
-    // Create a paragraph with a download href for each file
-    document.getElementById('status').innerHTML = "";
-    
-    files.forEach(file => {
-        document.getElementById('status').innerHTML += `<div class='statusOfFile' id='${file.name}_div'><p id='${file.name}_p'>${file.name} <b id='${file.name}_status'>processing</b></p></div>`;      
-    })
 
     /* BEG - request to backend to start transcribing */ 
-await fetch('http://mydomain.com/api', {
+await fetch('/api', {
         method: 'POST',
         body: formData,
     }).then(async response => {
         if(response.status === 202)
         {
-            const data = await response.json();
+            const {jobId, uniqueNames} = await response.json();
             
-            // Assuming the 202 response includes a jobId:
-            const jobId = data.jobId; 
+            console.log(uniqueNames)
 
-            // --- REPLACED POLLING LOGIC WITH WEBSOCKET ---
-            const websocketUrl = `ws://mydomain.com/api/ws/${jobId}`; 
+            for(const [uniqueFileName,OriginalFileName] of Object.entries(uniqueNames)) {
+                document.getElementById('status').innerHTML += `<div class='statusOfFile' id='${uniqueFileName}_div'><p id='${uniqueFileName}_p'>${OriginalFileName} <b id='${uniqueFileName}_status'>processing</b></p></div>`;      
+            }
+
+            // --- BEG WEBSOCKET LOGIC ---
+            const websocketUrl = `/api/ws/${jobId}`; 
             
             const ws = new WebSocket(websocketUrl);
             
             ws.onopen = () => {
-                ws.send(JSON.stringify({job: jobId, hola: "asdas"}));
+                ws.send(JSON.stringify({job: jobId}));
             }
             
             // Handler for receiving status updates from the server
@@ -110,9 +102,9 @@ await fetch('http://mydomain.com/api', {
                     
                     console.log('Received WebSocket update:', statusData);
                     
-                    const { status, originalFileName, downloadUrl, jobStatus} = statusData;
-                    const statusElement = document.getElementById(`${originalFileName}_status`);
-                    const divElement = document.getElementById(`${originalFileName}_div`);
+                    const { status, originalFileName, downloadUrl, jobStatus, uniqueFileName} = statusData;
+                    const statusElement = document.getElementById(`${uniqueFileName}_status`);
+                    const divElement = document.getElementById(`${uniqueFileName}_div`);
 
                     if(status === "done"){
                         statusElement.innerHTML = `<a class='download-link' href=${downloadUrl}>completed<br>`;
@@ -124,7 +116,6 @@ await fetch('http://mydomain.com/api', {
                     }
                     
                     // If the server indicates the entire job is finished, close the connection
-                    // (Requires the server to send a final 'jobComplete' flag)
                     if (jobStatus === "done") {
                         ws.close();
                         console.log('Job completed. WebSocket connection closed.');
@@ -146,7 +137,8 @@ await fetch('http://mydomain.com/api', {
             // --- END WEBSOCKET LOGIC ---
 
         } else {
-            // Handle non-202 responses
+            //  TODO - Handle non-202 responses
+            console.log(`Received a non-202 response - ${response}`)
         }
     }).catch(err => {
         console.log("Got an error", err);

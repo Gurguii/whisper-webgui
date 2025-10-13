@@ -28,7 +28,7 @@ RUN cmake -B build
 RUN cmake --build build -j --config Release
 
 # Download the model
-RUN bash ./models/download-ggml-model.sh medium
+#RUN bash ./models/download-ggml-model.sh medium
 
 # ========================
 # Stage 2: Minimal Runtime
@@ -39,21 +39,30 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ffmpeg \
     libstdc++6 \
+    curl \
+    ca-certificates \
     libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copy the specific compiled binary and model file
-COPY --from=builder /whisper/whisper.cpp/build/bin/whisper-server /app/
-COPY --from=builder /whisper/whisper.cpp/build/src/libwhisper* /app/libs/
-COPY --from=builder /whisper/whisper.cpp/build/ggml/src/libggml* /app/libs/
-COPY --from=builder /whisper/whisper.cpp/models/ggml*.bin /app/models/
-
-RUN echo '/app/libs' > /etc/ld.so.conf.d/whisper.conf && ldconfig
 
 EXPOSE 8080
 
-# Final command to run the server
-ENTRYPOINT [ "/app/whisper-server" ]
-CMD ["-m" , "/app/models/ggml-medium.bin", "--host", "0.0.0.0"]
+COPY --from=builder /whisper/whisper.cpp/build/bin/whisper-server /app/
+COPY --from=builder /whisper/whisper.cpp/build/src/libwhisper* /app/libs/
+COPY --from=builder /whisper/whisper.cpp/build/ggml/src/libggml* /app/libs/
+
+RUN echo '/app/libs' > /etc/ld.so.conf.d/whisper.conf && ldconfig
+
+COPY ./dockerfiles/custom_entrypoints/whisperworker.sh /
+
+RUN chmod +x /whisperworker.sh
+
+RUN mkdir -p /app/models
+
+EXPOSE 8080
+
+ENTRYPOINT [ "/whisperworker.sh" ]
+CMD ["-m", "/app/models/ggml-medium.bin", "--host", "0.0.0.0"]

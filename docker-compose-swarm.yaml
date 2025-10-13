@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  gwhisp-balancer:
+    image: gurgui/gwhisp-balancer:latest
+    
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: ingress
+    
+    environment:
+      - SERVER_NAME=gwhisp.com
+
+    deploy:
+      mode: replicated
+      replicas: 1
+
+      restart_policy:
+        condition: on-failure
+
+    networks:
+      - app-net
+      
+  gwhisp-frontend:
+    image: gurgui/gwhisp-frontend:latest
+    
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+    networks:
+      - app-net
+  
+  gwhisp-backend:
+    image: gurgui/gwhisp-backend:latest
+    
+    healthcheck:
+      test: ["CMD-SHELL", "netstat -ltnp | grep 3000 || exit 1"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
+      start_period: 30s
+
+    deploy:
+      mode: replicated
+      replicas: 2
+      restart_policy:
+        condition: any
+
+    networks:
+      - app-net
+
+  x-common-worker: &common-worker
+    image: gurgui/gwhisp-worker:latest
+    networks: [app-net]
+    volumes: [whisper_worker_models:/app/models:rw]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080 || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  gwhisp-worker-tiny:
+    <<: *common-worker
+    command: ["-m", "/app/models/ggml-tiny-q8_0.bin", "--host", "0.0.0.0", "--convert"]
+
+  gwhisp-worker-base:
+    <<: *common-worker
+    command: ["-m", "/app/models/ggml-base-q8_0.bin", "--host", "0.0.0.0", "--convert"]
+        
+  gwhisp-worker-small:
+    <<: *common-worker  
+    command: ["-m", "/app/models/ggml-small-q8_0.bin", "--host", "0.0.0.0", "--convert"]
+        
+  gwhisp-worker-medium:
+    <<: *common-worker
+    command: ["-m", "/app/models/ggml-medium-q8_0.bin", "--host", "0.0.0.0", "--convert"]
+
+  gwhisp-worker-large:
+    <<: *common-worker
+    command: ["-m", "/app/models/ggml-large-v3.bin", "--host", "0.0.0.0", "--convert"]
+
+  gwhisp-worker-turbo:
+    <<: *common-worker
+    command: ["-m", "/app/models/ggml-large-v3-turbo-q8_0.bin", "--host", "0.0.0.0", "--convert"]
+
+networks:
+  app-net:
+    driver: overlay
+
+volumes:
+  whisper_worker_models:
+    driver: local

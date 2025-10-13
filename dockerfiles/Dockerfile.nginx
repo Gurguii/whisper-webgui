@@ -2,10 +2,17 @@ FROM nginx:latest
 
 RUN apt update -y && apt upgrade -y
 
-COPY ./config/gwhisp_nginx_loadbalancing.conf /etc/nginx/conf.d/gwhisp.conf
+RUN rm /etc/nginx/conf.d/default.conf || true
 
-ENTRYPOINT ["nginx"]
+COPY ./config/gwhisp_nginx_nginx.conf /etc/nginx/nginx.conf
+COPY ./config/gwhisp_nginx_proxy.conf /etc/nginx/conf.d/gwhisp.conf.template
+COPY ./dockerfiles/custom_entrypoints/nginx.sh /nginx.sh
+
+RUN chmod +x /nginx.sh
+
+ENTRYPOINT ["/nginx.sh"]
 
 EXPOSE 80
 
-CMD ["-g", "daemon off;"]
+#CMD ["-g", "daemon off;"]
+CMD ["-g daemon off;"]

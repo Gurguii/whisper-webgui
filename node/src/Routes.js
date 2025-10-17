@@ -13,6 +13,4 @@ router.post('/whizard', multer.upload.array('audioVideoFile'), controller.transc
 /* File download */
 router.get("/download/:file", controller.downloadFile);
 
-// Export the router instance as the default export
-// This replaces: module.exports = router;
 export default router;

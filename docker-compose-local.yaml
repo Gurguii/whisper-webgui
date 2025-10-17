@@ -10,6 +10,9 @@ services:
       - "80:80"
 
     depends_on:
+      gwhisp-database:
+        condition: service_started
+
       gwhisp-backend:
         condition: service_healthy
         restart: true
@@ -74,6 +77,14 @@ services:
       - ${PWD}/node/src/:/app/
       - ${PWD}/node/node_modules/:/app/node_modules/
 
+  gwhisp-database:
+    image: mongo
+
+    expose:
+      - "27017"
+    networks:
+      - app-net
+    
   gwhisp-worker-tiny:
     image: gwhisp-worker
 

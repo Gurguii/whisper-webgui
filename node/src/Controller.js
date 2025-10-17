@@ -6,6 +6,8 @@ import axios from 'axios';
 import path from 'path';
 import uniqueFilename from 'unique-filename';
 import * as wsmanager from './WebSocketManager.js';
+import mongoColl from './MongoDb.js'
+import  { Binary } from 'mongodb';
 
 export let fileStatus = new Map();
 
@@ -79,14 +81,15 @@ export async function transcribeAndtranslate(req, res)
                 // Write data to file and update fileStatus
                 const randomTmpFilePath = path.join(randomTmpFile + fileExtension);
 
-                fs.writeFileSync(randomTmpFilePath, response.data, (err) => {
-                    if(err){
-                        console.log(`There was an error writing the response data to file ${randomTmpFilePath} - ${err}`)
+                // NEW - write data to mongodb server.
+                (async () => {
+                    try{
+                        await mongoColl.insertOne({id: uniqueFileName, data: response.data, extension: fileExtension});
+                        // TODO - check insertOne return value (true|false) and act appropiately
+                    }catch(err){
+                        console.log(`Caught an error inserting document - ${err}`);
                     }
-                    else{
-                        console.log(`File ${randomTmpFile} succesfully written to disk, updating status...`)
-                    }
-                });
+                })();
                 
                 --filesToProcess;
 
@@ -95,7 +98,7 @@ export async function transcribeAndtranslate(req, res)
                         status: "done",
                         uniqueFileName: uniqueFileName,
                         originalFileName: file.originalname,
-                        downloadUrl: `/api/download/${randomTmpFileBasenameExt}`,
+                        downloadUrl: `/api/download/${uniqueFileName}`,
                         jobStatus: `${filesToProcess === 0 ? "done" : "ongoing"}`
                     }
                 ));
@@ -103,7 +106,7 @@ export async function transcribeAndtranslate(req, res)
                 fileStatus[jobId][randomTmpFileBasenameExt] = {
                     status: "done",
                     originalFileName: file.originalname,
-                    downloadUrl: `/api/download/${randomTmpFileBasenameExt}`
+                    downloadUrl: `/api/download/${uniqueFileName}`
                 }
 
                 if(filesToProcess === 0){
@@ -132,51 +135,56 @@ export async function transcribeAndtranslate(req, res)
     res.status(202).json({jobId: jobId, filesToProcess: Object.keys(statusList).length, uniqueNames: uniqueNames});
 };
 
-export async function downloadFile(req, res) {
-    const filePath = path.join(tmpDir, req.params.file); 
+// /download-test/:file
+export async function downloadFile(req, res){
+    console.log(`File to retrieve: ${req.params.file}`);
+
+    if(!req.params.file){
+        res.status(400).json({});
+        return;
+    }
+
+    const { data, extension } = await mongoColl.findOne({id: req.params.file});
+
+    if (!data) {
+        res.status(404).json({msg: `File ${req.params.file} not found or has no content`});
+        return;
+    }
+
+    let buff;
+ 
+    if (data instanceof Binary) {
+        buff = data.buffer; 
+    } else if (typeof data === 'string') {
+        buff = Buffer.from(data, 'base64');
+    } else {
+        console.error('Data retrieved is neither a BSON Binary object nor a string.');
+        res.status(500).json({msg: 'Unexpected data type in database.'});
+        return;
+    }
     
-    console.log("Preparing to download and remove:", filePath);
+    if (buff && !(buff instanceof Buffer)) {
+        buff = Buffer.from(buff);
+    }
 
-    // 1. Pass the callback function as the second argument to res.download()
-    res.download(filePath, (err) => {
-        if (err) {
-            // Handle errors during the download process
-            console.log("Download attempt error:", err);
-            
-            // Check for File Not Found (ENOENT)
-            if (err.code === "ENOENT") {
-                console.log(`File ${filePath} not found`);
-                // Ensure a response is sent if the file is missing
-                // Check if headers have already been sent before responding
-                if (!res.headersSent) {
-                    return res.status(404).json({ status: "error", message: "File not found" });
-                }
-            } else {
-                // Handle other download errors (permissions, etc.)
-                console.log("Other download error:", err);
-                // Only send a 500 status if no headers have been sent yet
-                if (!res.headersSent) {
-                    return res.status(500).json({ status: "error", message: "Could not complete download" });
-                }
-            }
-        } else {
-            // 2. The download was successful (file streamed to the client).
-            console.log("Client successfully downloaded the file:", filePath);
-            
-            // 3. Delete the file after a successful download.
-            try {
-                fs.unlinkSync(filePath);
-                
-                console.log("Successfully removed file:", filePath);
+    if (buff.length === 0) {
+        res.status(400).json({msg: `File ${req.params.file} has empty or invalid content.`});
+        return;
+    }
 
-                if(fileStatus[req.params.file]){
-                    delete fileStatus[req.params.file];
-                    console.log("Succesfully deleted file entry from fileStatus dictionary")
-                }
+    const filename = `${req.params.file}${extension}`;
 
-            } catch (unlinkErr) {
-                console.log("Error removing file:", unlinkErr);
-            }
-        }
-    });
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buff.length);
+
+    res.status(200).send(buff);
+
+    console.log(`Removing ${filename} from database`);
+
+    if(await mongoColl.deleteOne({id: req.params.file})){
+        console.log(`Doc for ${req.params.file} removed`);
+    }else{
+        console.log(`Couldn't remove doc for ${req.params.file}`);
+    }
 }

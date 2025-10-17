@@ -28,7 +28,11 @@ async function checkWhisperService()
 
 async function initialChecks()
 {
-    return await checkWhisperService();
+    if(await checkWhisperService() == false){
+        return false;
+    };
+
+    return true;
 }
 
 export default initialChecks;

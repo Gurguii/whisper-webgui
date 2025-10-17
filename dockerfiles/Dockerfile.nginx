@@ -14,5 +14,4 @@ ENTRYPOINT ["/nginx.sh"]
 
 EXPOSE 80
 
-#CMD ["-g", "daemon off;"]
 CMD ["-g daemon off;"]

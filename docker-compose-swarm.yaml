@@ -47,12 +47,22 @@ services:
 
     deploy:
       mode: replicated
-      replicas: 2
+      replicas: 1
       restart_policy:
         condition: any
 
     networks:
       - app-net
+
+  gwhisp-database:
+    image: mongo
+
+    networks:
+      - app-net
+
+    deploy:
+      mode: replicated
+      replicas: 1
 
   x-common-worker: &common-worker
     image: gurgui/gwhisp-worker:latest
